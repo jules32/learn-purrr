@@ -1,0 +1,589 @@
+---
+title: "Code for conference debrief"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+```{r}
+library(tidyverse)
+library(repurrrsive)
+# devtools::install_github("jennybc/repurrrsive")
+```
+
+## Tibbles
+
+
+### 1. No coercing strings to characters
+```{r}
+(letters <- c(letters[1:10]))
+
+(letters_df <- data.frame(letters = letters))
+
+(letters_df <- data.frame(letters = letters, stringsAsFactors = FALSE))
+
+(letters_tbl <- tibble(letters)) # The same as dplyr::data_frame
+```
+
+### 2. Stable subsetting
+
+```{r}
+(df1 <- data.frame(x = 1:3, y = 3:1))
+
+df1[, 1:2]
+
+df1[, 1]
+
+df1[, 1, drop = FALSE]
+
+df2 <- tibble(x = 1:3, y = 3:1)
+
+df2[, 1:2]
+
+df2[, 2]
+
+df2[, 1]
+
+class(df2[, 1])
+```
+
+
+### 3. No partial Matching
+
+```{r}
+(lazy_df <- data.frame(names = c("Hadley", "Garret", "Joe"),
+                      course = c("Master R", "Tidyverse", "Shiny")))
+
+lazy_df$na
+
+(surly_tibble <- tibble(names = c("Hadley", "Garret", "Joe"),
+                      course = c("Master R", "Tidyverse", "Shiny")))
+
+surly_tibble$na
+```
+
+### 3. List columns!!
+
+```{r}
+data.frame(x = 1:3, y = list(1:5, 1:10, 1:20))
+
+tibble(x = 1:3, y = list(1:5, 1:10, 1:20))
+```
+
+
+### 4. Evaluates arguments lazily and sequentially
+```{r}
+data.frame(x = 1:5, y = x ^ 2)
+
+data.frame(x = 1:5) %>% 
+  mutate(y = x ^ 2)
+
+tibble(x = 1:5, y = x ^ 2)
+```
+
+## Functional Programming
+
+### Warm ups:
+
+What does this function return?
+
+```{r}
+y <- 10
+
+g <- function() {
+    x <- 5
+    c(x = x, y = y)
+}
+
+g()
+```
+
+
+What does this function return the first time? the second time?
+```{r}
+j <- function() {
+    if (!exists("a")) {
+        a <- 5
+    } else {
+        a <- a + 1
+    }
+    a
+}
+
+j()
+
+j()
+```
+
+Function runs are independent. They start always with a clean slate!
+ 
+How many positions have NA in both vectors??
+ 
+```{r}
+# Write code to determine how many positions
+# have an NA in both vectors.
+x <- c(1, 1, NA, NA)
+
+y <- c(1, NA, 1, NA)
+```
+
+
+```{r}
+# Think about positions
+which(is.na(x))
+
+which(is.na(y))
+
+intersect(which(is.na(x)), which(is.na(y)))
+
+length(intersect(which(is.na(x)), which(is.na(y))))
+
+# OR
+ 
+sum(which(is.na(x)) %in% which(is.na(y)))
+```
+
+```{r}
+# Boolean algebra
+is.na(x) & is.na(y)
+
+sum(is.na(x) & is.na(y))
+```
+
+
+```{r}
+# after solving the problem make a function to generalize!
+
+both_na <- function(x, y) {
+  sum(is.na(x) & is.na(y))
+}
+
+both_na(x, y)
+```
+
+### Why write functions?
+### Good functions
+
+#### Fail fast 
+```{r}
+x <- c(1,NA)
+y <- c(1,2,NA,NA)
+both_na(x, y)
+```
+
+
+```{r}
+both_na <- function(x, y) {
+  stopifnot(length(x) == length(y))
+  sum(is.na(x) & is.na(y))
+}
+
+both_na(x, y)
+```
+
+```{r}
+both_na <- function(x, y) {
+  if (length(x) != length(y))
+    stop("`x` and `y` must be the same length.")
+    stop("`x` and `y` are different lengths.")
+  sum(is.na(x) & is.na(y))
+}
+
+both_na(x,y)
+```
+
+## For loops (back to slides)
+## Functional programming
+
+```{r}
+set.seed(1014)
+l <- rerun(20, runif(sample(1:10, 1)))
+str(l)
+```
+
+```{r}
+l[1]
+
+l[2:5]
+
+l[[10]]
+```
+
+
+```{r}
+compute_length <- function(x) {
+  out <- numeric(length(x))
+  for (i in seq_along(x)) {
+    out[[i]] <- length(x[[i]])
+  }
+out }
+
+compute_length(l)
+```
+
+```{r}
+compute_mean <- function(x) {
+  out <- numeric(length(x))
+  for (i in seq_along(x)) {
+    out[[i]] <- mean(x[[i]])
+  }
+out }
+```
+
+```{r}
+compute_median <- function(x) {
+  out <- numeric(length(x))
+  for (i in seq_along(x)) {
+    out[[i]] <- median(x[[i]])
+  }
+out }
+```
+
+```{r}
+compute <- function(x, f) {
+  out <- numeric(length(x))
+  for(i in seq_along(x)) {
+    out[[i]] <- f(x[[i]])
+  }
+out }
+
+compute(l, length)
+compute(l, mean)
+compute(l, median)
+```
+
+We have just created something very similar to sapply()
+
+```{r}
+sapply(l, length)
+```
+
+But... purrr map() functions are better :)
+
+```{r}
+map_dbl(l, length)
+map_dbl(l,mean)
+```
+
+Why not lapply?
+
+### type stable
+
+```{r}
+df <- data.frame(
+  a = 1L,
+  b = 1.5,
+  y = Sys.time(),
+  z = ordered(1)
+)
+
+df[1:4] %>% 
+  sapply(class) %>% 
+  str()
+
+df[1:2] %>% 
+  sapply(class) %>% 
+  str()
+
+df[3:4] %>% 
+  sapply(class) %>% 
+  str()
+```
+
+```{r}
+col_means <- function(df) {
+  numeric <- sapply(df, is.numeric)
+  numeric_cols <- df[, numeric]
+  data.frame(lapply(numeric_cols, mean))
+}
+```
+
+
+```{r}
+col_means(mtcars)
+
+col_means(mtcars[, "mpg", drop = F])
+
+df <- data.frame(x = 1:26, y = letters)
+
+col_means(df)
+
+map_dbl(mtcars, mean)
+map_dbl(df, mean)
+```
+
+```{r}
+col_means <- function(df) {
+  stopifnot(is.data.frame(df))
+  
+  numeric <- map_lgl(df, is.numeric)
+  numeric_cols <- df[, numeric, drop = FALSE]
+  data.frame(lapply(numeric_cols, mean))
+}
+```
+
+```{r}
+col_means <- function(df) {
+  stopifnot(is.data.frame(df))
+  df %>%
+    purrr::keep(is.numeric) %>%
+    purrr::map(mean) %>%
+    as.data.frame()
+}
+```
+
+### Syntax and shortcuts (go to slides) 
+
+
+```{r}
+library(repurrrsive)
+
+got_people <- got_chars
+```
+
+#### How many nicknames each character has?
+
+```{r}
+theon <- got_people[[1]]
+
+length(theon$aliases)
+
+tyrion <- got_people[[2]]
+
+length(tyrion$aliases)
+
+```
+
+##### Turn it into a formula: `~ length(.x$aliases)`
+
+```{r}
+purrr::map(got_people, ~ length(.x$aliases)) 
+
+purrr::map_dbl(got_people, ~ length(.x[["aliases"]]))  %>% 
+  purrr::set_names(map_chr(got_people, ~.x$name))
+```
+
+##### map() can also take character strings!
+
+```{r}
+map_lgl(got_people, "alive") %>% 
+  purrr::set_names(map_chr(got_people, "name")) %>% 
+  keep(isTRUE) 
+```
+
+##### map() can also take character integers
+
+```{r}
+map_chr(got_people, 5) %>% 
+  purrr::set_names(map_chr(got_people, "name")) 
+```
+
+#### purr and list columns
+
+```{r}
+x <- tibble(
+  name = got_chars %>% map_chr("name"),
+  aliases = got_chars %>% map("aliases"),
+  allegiances = got_chars %>% map("allegiances")
+)
+```
+
+```{r}
+x <- x %>% 
+  mutate(lannister = map(allegiances, stringr::str_detect, pattern = "Lannister"),
+         lannister = map_lgl(lannister, any))
+```
+
+
+#### Handling errors
+
+```{r}
+input <- list(1:10, sqrt(4), 5, "1")
+
+map(input, log)
+
+map(input, safely(log)) 
+
+results <- input %>% 
+  map(safely(log)) %>% 
+  transpose()
+  
+ok <- map_lgl(results$error, is.null)
+
+ok
+
+input[ok]
+```
+
+
+## the power of all combined
+```{r}
+monthly_effort_by_vessel <- readRDS("monthly_effort_by_mmsi")
+```
+
+```{r}
+monthly_effort_by_vessel %>% 
+  group_by(date, country) %>%
+  summarise(total_distance_traveled = sum(distance_traveled)) %>% 
+  arrange(date) %>%
+  ggplot(aes(x = date, y = total_distance_traveled)) +
+  geom_smooth() +
+  geom_path() +
+  theme_minimal() +
+  facet_wrap(~ country)
+```
+
+```{r}
+#devtools::install_github("hafen/trelliscopejs")
+monthly_effort_by_vessel %>% 
+  group_by(date, country) %>%
+  summarise(total_distance_traveled = sum(distance_traveled)) %>% 
+  arrange(date) %>%
+  ggplot(aes(x = date, y = total_distance_traveled)) +
+  geom_smooth() +
+  geom_path() +
+  theme_minimal() +
+  trelliscopejs::facet_trelliscope(~country)
+```
+
+```{r}
+nested_monthly_df <- monthly_effort_by_vessel %>%
+  filter(!is.na(country)) %>% 
+  group_by(country) %>% 
+  nest()
+
+nested_monthly_df
+```
+
+```{r}
+detrending_model <- function(my_data){
+  lm(distance_traveled ~ factor(lubridate::month(date)), data = my_data)
+}
+
+detrended_nested_monthly_df <- nested_monthly_df %>% 
+  mutate(detrended_model = map(data, detrending_model))
+
+detrended_nested_monthly_df
+
+detrended_nested_monthly_df$detrended_model[[1]]
+```
+
+```{r}
+detrended_nested_monthly_df <- detrended_nested_monthly_df %>% 
+  mutate(residuals = purrr::map2(data, detrended_model, modelr::add_residuals, "residuals"))
+```
+
+```{r}
+detrended_plot <- function(detrended_df){
+  ggplot(detrended_df) +
+    geom_path(aes(x = date, y = residuals)) +
+    geom_smooth(aes(x = date, y = residuals))
+}
+
+detrended_nested_monthly_df <- detrended_nested_monthly_df %>% 
+  mutate(plot = trelliscopejs::map_plot(residuals, detrended_plot))
+
+detrended_nested_monthly_df %>%
+  trelliscopejs::trelliscope(name = "plot")
+```
+
+
+```{r}
+detrended_nested_monthly_df %>% 
+  mutate(summary = map(detrended_model,broom::glance)) %>% 
+  unnest(summary)
+```
+
+
+## Crosstalk
+
+```{r}
+# devtools::install_github("rstudio/crosstalk")
+# devtools::install_github("jcheng5/d3scatter")
+# devtools::install_github("rstudio/leaflet")
+```
+
+
+```{r}
+library(leaflet)
+library(tidyverse)
+library(crosstalk)
+library(d3scatter)
+
+
+map <- leaflet(quakes, width = "100%", height = 300) %>%
+    addTiles() %>%
+    addMarkers()
+
+plot <- d3scatter::d3scatter(quakes, ~depth, ~mag, width = "100%")
+
+crosstalk::bscols(
+  plot,
+  map
+)
+
+shared_quakes <- crosstalk::SharedData$new(quakes[sample(nrow(quakes), 100),])
+
+
+crosstalk::bscols(
+  leaflet(shared_quakes, width = "100%", height = 300) %>%
+    addTiles() %>%
+    addMarkers(),
+  d3scatter::d3scatter(shared_quakes, ~depth, ~mag, width = "100%")
+)
+```
+
+
+```{r}
+shared_iris <- SharedData$new(iris)
+
+bscols(
+  d3scatter(shared_iris, ~Petal.Length, ~Petal.Width, ~Species, width="100%", height=300),
+  d3scatter(shared_iris, ~Sepal.Length, ~Sepal.Width, ~Species, width="100%", height=300)
+)
+```
+
+```{r}
+shared_mtcars <- SharedData$new(mtcars)
+
+bscols(widths = c(3,NA,NA),
+  list(
+    filter_checkbox("cyl", "Cylinders", shared_mtcars, ~cyl, inline = TRUE),
+    filter_slider("hp", "Horsepower", shared_mtcars, ~hp, width = "100%"),
+    filter_select("auto", "Automatic", shared_mtcars, ~ifelse(am == 0, "Yes", "No"))
+  ),
+  d3scatter(shared_mtcars, ~wt, ~mpg, ~factor(cyl), width="100%", height=250),
+  d3scatter(shared_mtcars, ~hp, ~qsec, ~factor(cyl), width="100%", height=250)
+)
+```
+
+### Tesseract
+
+```{r}
+install.packages("tesseract")
+
+text <- tesseract::ocr("tesseract_test.png")
+cat(text)
+```
+
+### Corrr
+
+```{r}
+devtools::install_github("drsimonj/corrr")
+
+library(corrr)
+
+x <- mtcars %>%
+       correlate() %>%    # Create correlation data frame (cor_df)
+       focus(-cyl, -vs, mirror = TRUE) %>%  # Focus on cor_df without 'cyl' and 'vs'
+       rearrange() %>%  # rearrange by correlations
+       shave() # Shave off the upper triangle for a clean result
+
+
+rplot(x)
+
+airquality %>%
+       correlate() %>% 
+  network_plot(min_cor = .2, legend = TRUE)
+```
+

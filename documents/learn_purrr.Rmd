@@ -18,7 +18,7 @@ library(tidyverse)
 library(purrr)
 library(repurrrsive)
 library(stringr)
-library(ggthemes)
+library(ggthemes) # install.packages('ggthemes')
 library(gapminder)
 library(modelr)
 
@@ -107,7 +107,8 @@ The (main) advantages of using things like `apply` or `map` though are though th
 
 ```{r}
 
-map(mtcars, mean, na.rm = T)
+map(mtcars, mean, na.rm = T) # will return a list
+map_df(mtcars, mean, na.rm = T) # will return a df
 
 ```
 
@@ -133,6 +134,8 @@ Specifying type makes it easier to wrangle different types of outputs
 ```{r}
 
 map2_chr(c('one','two','red','blue'), c('fish'), paste)
+# it sequences through the first list, and pastes it with the second list
+# also use expand.grid(), which creates factorial combinations of everything
 
 ```
 
@@ -177,6 +180,7 @@ out <- (is.na(x) & is.na(y))
 
 }
 
+## these will all do the same thing
 
 map(z, sum)
 
@@ -215,7 +219,7 @@ foo <- function(x,y) {
 
 foo(x = 2,y = 3)
 
-z
+z # what happens inside the function stays inside the function
 ```
 
 Notice that `z` wasn't affected by the `z` inside the function. Operations inside functions happen in the local environment of that function. "What happens in the function, stays in the function (except what you share via Facebook/`return`)"
@@ -228,7 +232,7 @@ a <- 10
 
 foo <- function(x,y) {
 
-z <- x + y + a
+z <- x + y + a # but function can see the variable outside --> but this will cause problems
 
 return(z)
 }
@@ -263,7 +267,7 @@ Can be accomplished using
 
 ```{r}
 
-map(mtcars, ~ sd(.) / mean(.))
+map(mtcars, ~ sd(.) / mean(.)) # . is the placeholder for the data that's being passed
 
 ```
 
@@ -276,6 +280,8 @@ mtcars %>%  {
 ```
 
 The `{` after the pipe tells R that the things inside the brackets don't take the data passed to it as its first argument
+
+Way to get a non-dataframe output::: Why would you do this with `select()`? this is a way to not get a data frame back - just get the values back. 
 
 ## Wrangling lists
 
@@ -297,7 +303,7 @@ str(got_chars, list.len =  3)
 ```
 
 
-For those of you who prefer a more interactive approach, you can also use the `jsonedit` function in the `listviewer` package
+For those of you who prefer a more interactive approach, you can also use the `jsonedit` function in the `listviewer` package - awesome
 
 
 
@@ -338,7 +344,7 @@ Here's how we do that in `purrr`
 
 ```{r}
 
-got_chars[1:5] %>%
+got_chars[1:15] %>% # with just single brackets it keeps it as a list
   map_chr('name')
 
 ```
@@ -348,9 +354,15 @@ got_chars[1:5] %>%
 
 ```{r}
 
+## this won't work
 got_chars[1:5] %>%
   map(c('name','allegiances')) %>%
   listviewer::jsonedit()
+
+# but this would work says Juan
+# got_chars[1:5] %>%
+#   ?invoke(c('name','allegiances')) %>%
+#   listviewer::jsonedit()
 
 ```
 
@@ -360,8 +372,8 @@ Huh, why didn't that work? `purrr` has some built in helpers for simple operatio
 
 ```{r}
 got_chars[1:5] %>%
-set_names(map_chr(., 'name')) %>%
-map(`[`, c('name', 'allegiances')) %>%
+# set_names(map_chr(., 'name')) %>%
+map(`[`, c('name', 'allegiances')) %>% # [ = turn my list operation into a function
 listviewer::jsonedit()
 ```
 
@@ -376,7 +388,7 @@ thing <- list(list(y = 2, z = list(w = 'hello')),
 
 str(thing)
 
-map_chr(thing, c('z','w'))
+map_chr(thing, c('z','w')) # z, w is taking the place of a function; a shortcut for .$
 
 ```
 
@@ -397,14 +409,14 @@ Much better! Now, suppose that I want more than just the names
 
 Now, let's say that I want to get all the Lanisters, so I can see which people to hate.
 
-This is where a lot of the power of `purrr` starts to come in, allowing you to easily apply functions across nested layers of a list
+This is where a lot of the power of `purrr` starts to come in, allowing you to easily apply functions across nested layers of a list as you poke through them.
 
 
 ```{r}
 got_chars %>%
   set_names(map_chr(.,'name')) %>%
   map(`[`,c('name','allegiances')) %>%
-  keep(~str_detect(.$name, 'Lannister')) %>%
+  keep(~str_detect(.$name, 'Lannister')) %>% # equivalent of dplyr::filter. keep() needs an anonmymous funciton `~`
   listviewer::jsonedit()
 ```
 
@@ -420,7 +432,9 @@ map(~str_detect(.$allegiances, 'Stark'))
 ```
 
 
-Hmmm, that doesn't look good, what's up with Will? What happens if I try and use `keep` (list `filter`) here?
+Hmmm, that doesn't look good, what's up with Will? What happens if I try and use `keep` (list `filter`) here? -> a lot of errors are when there are data missing from the list
+
+`tidyr::nest()` and `tidyr::unnest()` is kind of like unlist... also see purr::collapse.
 
 
 ```{r, eval = F}
@@ -465,10 +479,12 @@ You can also use `map` together with your own custom functions. Suppose we wante
 
 ```{r}
 
+## shorter than below but...
 got_list <- got_chars %>%
   map(`[`, c('name','aliases','allegiances','born'))
 
-got_list <-  got_chars %>% {
+## does the same as above but is way more explicit about the output type w/ map_chr
+got_list <-  got_chars %>% { ## notice the brackets again like we saw above
   list(
     name = map_chr(.,'name'),
     aliases = map(.,'aliases'),
@@ -490,6 +506,8 @@ got_list %>%
   pmap_chr(got_foo) %>%
   head()
 
+## example above could have been done more with tibble and mutate; this isn't the best way to do it but it's the way to do it with purrr
+
 ```
 
 
@@ -505,6 +523,13 @@ got_chars %>%
 
 ```
 
+Tracey: would you ever want to leave things in a list? Tyler: think of df::list as spreadsheet::database. Sometimes you want it 
+
+Ben Best: Spatial is a great example of how to interact with lists. This is increasingly more required for online databases. Each time you use an html widget it's pushing your json object, and when you read it in and out as a heirarchical list. Also xml
+
+Does purrr have built-in API interaction?
+
+purrr is the missing link between being tidy but not using dfs. tidyverse is a glorified pivot table
 
 ## Analysis with `purrr` and `modelr`
 
@@ -563,6 +588,8 @@ m3 <- 'lifeexp ~ pop + gdppercap + country + year'
 
 m4 <- 'lifeexp ~ pop + gdppercap + year*country'
 
+# Store these models as a tibble
+
 ```
 
 
@@ -570,6 +597,7 @@ Now, since this is a simple three model example, we could just use a loop, or ev
 
 
 Let's start by getting our models and data into a data frame, using list-columns
+
 
 ```{r}
 
@@ -615,10 +643,10 @@ We're now going to start integrating some methods from the `modelr` package to d
 
 ```{r}
 model_frame <- model_frame %>%
-mutate(r2 = map_dbl(fit, ~rsquare(., data = gapminder)),
-aic = map_dbl(fit, ~AIC(.)))
-
-model_frame
+  mutate(r2  = map_dbl(fit, ~ modelr::rsquare(., data = gapminder)),
+  aic = map_dbl(fit, ~ AIC(.))) # why do you need the ~ here? when in doubt, ~XXX(.)
+  
+  model_frame
 
 ```
 
@@ -633,15 +661,15 @@ We'll start by using the `modelr` package to create a bunch of training-test com
 
 
 validate <- gapminder %>%
-crossv_mc(20, test = 0.25)
+  crossv_mc(20, test = 0.25)
 
 test_data <- list(test_training = list(validate), model = model_frame$model)
 
 
 test_data <- cross_d(test_data) %>%
-unnest(test_training, .drop = F, .id = 'model_number') %>%
-mutate(model_number = as.numeric(model_number)) %>%
-left_join(data_frame(model_number = c(1:4), model_name = c('simple','medium', 'more','woah')), by = 'model_number')
+  unnest(test_training, .drop = F, .id = 'model_number') %>%
+  mutate(model_number = as.numeric(model_number)) %>%
+  left_join(data_frame(model_number = c(1:4), model_name = c('simple','medium', 'more','woah')), by = 'model_number')
 
 test_data
 ```
@@ -654,7 +682,7 @@ In a few lines of code, we now have "tidy" cross validation routine across multi
 
 test_data <- test_data %>%
 mutate(fit = map2(model, train, ~lm(.x, data = .y))) %>%
-mutate(root_mean_sq_error = map2_dbl(fit, test, rmse))
+mutate(root_mean_sq_error = map2_dbl(fit, test, modelr::rmse))
 
 test_data
 ```
@@ -669,6 +697,8 @@ labs(x = 'Root Mean Squared Error', title = 'Cross-validated distribution of RMS
 
 
 ```
+
+instead of looping over, you're sweeping across. 
 
 ## Miscellaneos `purrr`
 
@@ -717,7 +747,7 @@ Our goal is to put all of these observations together, log transform the lengths
 ```{r, eval = F}
 
 length_data %>% 
-  map(log,.$lengths)
+  map(log, .$lengths)
 
 ```
 
@@ -725,7 +755,7 @@ Yep, that doesn't work, since `map` hit an error somewhere in there. Now, we cou
 
 ```{r}
 
-safe_log <-  safely(log)
+safe_log <-  safely(log) # define a functiony thing
 
 diagnose_length <- length_data %>% 
   map(~safe_log(.$lengths))
@@ -821,7 +851,7 @@ summary(gapminder %>% select(year,lifeexp, pop, gdppercap))
 
 This can can make your regression a little hard to interpret. How do you think about the intercept in this model for example? Or, how do you compare the relative magnitude of coefficients? An increase of 1 year life expectancy is a much bigger shift and an increase in population of 1.
 
-You can "center and scale" you data to resolve this problem, generally by
+You can "**center and scale**" you data to resolve this problem, generally by
 
 $$ x^{centered, scaled} = \frac{(x - mean(x))} {2\sigma_{x}}  $$
 See Gelman & Hill 2007 for a good explanation of this.
@@ -833,22 +863,22 @@ Suppose then that we want to center and scale all of the continuous variables in
 ```{r}
 
 center_scale <- function(x, xname, omit_names = '') {
-
-if (is.numeric(x) & !all(unique(x) %in% c(1, 0)) &
-!xname %in% omit_names) {
-x <- (x - mean(x)) / (2* sd(x))
-
-}
-
-return(x)
-
+  
+  if (is.numeric(x) & !all(unique(x) %in% c(1, 0)) &
+      !xname %in% omit_names) {
+    x <- (x - mean(x)) / (2* sd(x))
+    
+  }
+  
+  return(x)
+  
 }
 
 gapminder %>%
-map2_df(
-colnames(.),
-center_scale
-)
+  map2_df(
+    colnames(.),
+    center_scale
+  )
 
 ```
 
@@ -903,15 +933,14 @@ Suppose I want to save both of these plots?
 
 ```{r}
 
-plot_files <- (ls()[ str_detect(ls(), '_plot')])
+plot_files <- (ls()[str_detect(ls(), '_plot')])
 
-plot_foo <- function(x){
-
-ggsave(paste0(x,'.pdf'), get(x), device = cairo_pdf)
+plot_foo <- function(x) {
+  ggsave(paste0(x, '.pdf'), get(x), device = cairo_pdf)
 
 }
 
-walk(plot_files, plot_foo)
+purrr::walk(plot_files, plot_foo) # walk gives but doesn't output
 
 ```
 
